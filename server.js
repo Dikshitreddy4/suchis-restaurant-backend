@@ -241,6 +241,161 @@ app.put("/menu/availability/:id", async (req, res) => {
     res.status(500).send("❌ Error updating availability");
   }
 });
+// ------------------------------
+// ORDER MANAGEMENT + KOT SYSTEM
+// ------------------------------
+
+// Create Order
+app.post("/order/create", async (req, res) => {
+  try {
+    const { branch_id, order_type, table_no, customer_id } = req.body;
+
+    const order = await pool.query(
+      `INSERT INTO orders (branch_id, order_type, table_no, customer_id)
+       VALUES ($1, $2, $3, $4) RETURNING id`,
+      [branch_id, order_type, table_no, customer_id]
+    );
+
+    res.send({ order_id: order.rows[0].id, message: "🧾 Order created" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("❌ Error creating order");
+  }
+});
+
+// Add Item to Order + Generate KOT
+app.post("/order/add-item", async (req, res) => {
+  try {
+    const { order_id, item_id, quantity } = req.body;
+
+    // fetch menu item price + gst
+    const item = await pool.query(
+      `SELECT price, gst_rate FROM items WHERE id = $1`,
+      [item_id]
+    );
+
+    if (item.rows.length === 0)
+      return res.status(400).send("❌ Item not found");
+
+    const price = item.rows[0].price;
+    const gst_rate = item.rows[0].gst_rate;
+
+    // insert into order_items
+    await pool.query(
+      `INSERT INTO order_items (order_id, item_id, quantity, price, gst_rate)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [order_id, item_id, quantity, price, gst_rate]
+    );
+
+    // insert into KOT
+    await pool.query(
+      `INSERT INTO kot (order_id, item_id, quantity)
+       VALUES ($1, $2, $3)`,
+      [order_id, item_id, quantity]
+    );
+
+    res.send("🍽 Item added + KOT generated");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("❌ Error adding item");
+  }
+});
+
+// Get Order Details
+app.get("/order/details/:order_id", async (req, res) => {
+  try {
+    const order = await pool.query(
+      `SELECT * FROM orders WHERE id = $1`,
+      [req.params.order_id]
+    );
+
+    const items = await pool.query(
+      `SELECT oi.*, i.name 
+       FROM order_items oi
+       JOIN items i ON oi.item_id = i.id
+       WHERE order_id = $1`,
+      [req.params.order_id]
+    );
+
+    res.json({
+      order: order.rows[0],
+      items: items.rows
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("❌ Error fetching order");
+  }
+});
+
+// Update Order Status (Pending → Completed → Billed)
+app.put("/order/status/:id", async (req, res) => {
+  try {
+    const { status } = req.body;
+
+    await pool.query(
+      `UPDATE orders SET status = $1 WHERE id = $2`,
+      [status, req.params.id]
+    );
+
+    res.send("🔄 Order status updated");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("❌ Error updating order status");
+  }
+});
+
+// Get all Open Orders for Billing Screen
+app.get("/order/list/:branch_id", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM orders 
+       WHERE branch_id = $1 
+       ORDER BY created_at DESC`,
+      [req.params.branch_id]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("❌ Error fetching orders");
+  }
+});
+
+// Get Pending KOT for Kitchen Display
+app.get("/kot/pending/:branch_id", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT k.*, i.name 
+       FROM kot k
+       JOIN items i ON k.item_id = i.id
+       JOIN orders o ON o.id = k.order_id
+       WHERE o.branch_id = $1 AND k.kot_status = 'PENDING'
+       ORDER BY k.created_at ASC`,
+      [req.params.branch_id]
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("❌ Error fetching KOTs");
+  }
+});
+
+// Mark KOT as Completed
+app.put("/kot/complete/:kot_id", async (req, res) => {
+  try {
+    await pool.query(
+      `UPDATE kot SET kot_status = 'COMPLETED' WHERE id = $1`,
+      [req.params.kot_id]
+    );
+
+    res.send("👨‍🍳 KOT completed");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("❌ Error updating KOT");
+  }
+});
+
 
 
 
