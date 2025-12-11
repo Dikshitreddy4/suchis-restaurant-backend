@@ -160,5 +160,88 @@ const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
+// ------------------------------
+// MENU MANAGEMENT
+// ------------------------------
+
+// Add Item
+app.post("/menu/add", async (req, res) => {
+  try {
+    const { branch_id, name, price, gst_rate, category } = req.body;
+
+    await pool.query(`
+      INSERT INTO items (branch_id, name, price, gst_rate, category)
+      VALUES ($1, $2, $3, $4, $5)
+    `, [branch_id, name, price, gst_rate, category]);
+
+    res.send("✅ Item added successfully");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("❌ Error adding item");
+  }
+});
+
+// Update Item
+app.put("/menu/update/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { name, price, gst_rate, category, is_available } = req.body;
+
+    await pool.query(`
+      UPDATE items
+      SET name = $1, price = $2, gst_rate = $3, category = $4, is_available = $5
+      WHERE id = $6
+    `, [name, price, gst_rate, category, is_available, id]);
+
+    res.send("✅ Item updated successfully");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("❌ Error updating item");
+  }
+});
+
+// Delete Item
+app.delete("/menu/delete/:id", async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM items WHERE id = $1`, [req.params.id]);
+    res.send("🗑 Item deleted successfully");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("❌ Error deleting item");
+  }
+});
+
+// Get All Items
+app.get("/menu/list/:branch_id", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM items WHERE branch_id = $1 ORDER BY id ASC`,
+      [req.params.branch_id]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("❌ Error fetching items");
+  }
+});
+
+// Update Availability (in stock / out of stock)
+app.put("/menu/availability/:id", async (req, res) => {
+  try {
+    const { is_available } = req.body;
+
+    await pool.query(
+      `UPDATE items SET is_available = $1 WHERE id = $2`,
+      [is_available, req.params.id]
+    );
+
+    res.send("🔄 Availability updated");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("❌ Error updating availability");
+  }
+});
+
+
 
 
