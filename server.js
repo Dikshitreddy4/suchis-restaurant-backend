@@ -545,6 +545,73 @@ app.get("/inventory/alerts/:branch_id", async (req, res) => {
     res.status(500).send("❌ Error loading low stock alerts");
   }
 });
+// ------------------------------
+// CUSTOMER MANAGEMENT
+// ------------------------------
+
+// Add Customer
+app.post("/customer/add", async (req, res) => {
+  try {
+    const { name, phone } = req.body;
+
+    await pool.query(
+      `INSERT INTO customers (name, phone)
+       VALUES ($1, $2)`,
+      [name, phone]
+    );
+
+    res.send("👤 Customer added");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("❌ Error adding customer");
+  }
+});
+
+// Update Customer
+app.put("/customer/update/:id", async (req, res) => {
+  try {
+    const { name, phone } = req.body;
+
+    await pool.query(
+      `UPDATE customers SET name = $1, phone = $2 WHERE id = $3`,
+      [name, phone, req.params.id]
+    );
+
+    res.send("🔄 Customer updated");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("❌ Error updating customer");
+  }
+});
+
+// Get Customer Info
+app.get("/customer/:id", async (req, res) => {
+  try {
+    const customer = await pool.query(
+      `SELECT * FROM customers WHERE id = $1`,
+      [req.params.id]
+    );
+
+    if (customer.rows.length === 0)
+      return res.status(404).send("❌ Customer not found");
+
+    res.json(customer.rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("❌ Error loading customer");
+  }
+});
+
+// List All Customers
+app.get("/customers", async (req, res) => {
+  try {
+    const result = await pool.query(`SELECT * FROM customers ORDER BY id DESC`);
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("❌ Error loading customers");
+  }
+});
 
 
 
