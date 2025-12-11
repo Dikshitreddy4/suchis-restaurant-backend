@@ -2,7 +2,7 @@
 // Required Imports
 // ------------------------------
 const express = require('express');
-const { Pool } = require('pg');     // <-- IMPORTANT
+const { Pool } = require('pg'); 
 const app = express();
 app.use(express.json());
 
@@ -17,14 +17,12 @@ const connectionString =
 let pool;
 
 if (connectionString) {
-  // Railway single connection string
   pool = new Pool({
     connectionString,
     ssl: { rejectUnauthorized: false }
   });
   console.log("Connected using DATABASE_URL / POSTGRES_URL");
 } else {
-  // Railway manual PG variables
   pool = new Pool({
     host: process.env.PGHOST,
     user: process.env.PGUSER,
@@ -52,5 +50,32 @@ app.get("/init", async (req, res) => {
       CREATE TABLE IF NOT EXISTS items (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255),
-        price NUMER
+        price NUMERIC(10,2)
+      );
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS orders (
+        id SERIAL PRIMARY KEY,
+        item_id INT REFERENCES items(id),
+        quantity INT,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    res.send("✅ Tables initialized successfully");
+  } catch (err) {
+    console.error("Error creating tables:", err);
+    res.status(500).send("❌ Error creating tables");
+  }
+});
+
+// ------------------------------
+// Start Server
+// ------------------------------
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
+
 
