@@ -395,6 +395,87 @@ app.put("/kot/complete/:kot_id", async (req, res) => {
     res.status(500).send("❌ Error updating KOT");
   }
 });
+// ------------------------------
+// BILLING + GST SYSTEM
+// ------------------------------
+
+// Generate Bill (final bill for order)
+app.post("/billing/generate/:order_id", async (req, res) => {
+  try {
+    const order_id = req.params.order_id;
+    const { payment_method, branch_id } = req.body;
+
+    // Get all items in order
+    const items = await pool.query(
+      `SELECT quantity, price, gst_rate
+       FROM order_items WHERE order_id = $1`,
+      [order_id]
+    );
+
+    if (items.rows.length === 0) {
+      return res.status(400).send("❌ No items found for order");
+    }
+
+    // Calculate amounts
+    let subtotal = 0;
+    let gst_amount = 0;
+
+    items.rows.forEach(i => {
+      const item_total = i.quantity * i.price;
+      const item_gst = item_total * (i.gst_rate / 100);
+
+      subtotal += item_total;
+      gst_amount += item_gst;
+    });
+
+    const net_amount = subtotal + gst_amount;
+
+    // Save into transactions table
+    await pool.query(
+      `INSERT INTO transactions (order_id, branch_id, total_amount, gst_amount, net_amount, payment_method)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [order_id, branch_id, subtotal, gst_amount, net_amount, payment_method]
+    );
+
+    // Update order status
+    await pool.query(
+      `UPDATE orders SET total_amount = $1, gst_amount = $2, net_amount = $3, status = 'BILLED'
+       WHERE id = $4`,
+      [subtotal, gst_amount, net_amount, order_id]
+    );
+
+    res.json({
+      message: "🧾 Bill generated successfully",
+      subtotal,
+      gst_amount,
+      net_amount
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("❌ Error generating bill");
+  }
+});
+
+// View Bill for order
+app.get("/billing/view/:order_id", async (req, res) => {
+  try {
+    const bill = await pool.query(
+      `SELECT * FROM transactions WHERE order_id = $1`,
+      [req.params.order_id]
+    );
+
+    if (bill.rows.length === 0) {
+      return res.status(404).send("❌ Bill not found");
+    }
+
+    res.json(bill.rows[0]);
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("❌ Error loading bill");
+  }
+});
 
 
 
