@@ -612,6 +612,100 @@ app.get("/customers", async (req, res) => {
     res.status(500).send("❌ Error loading customers");
   }
 });
+// ------------------------------
+// REPORTS SYSTEM
+// ------------------------------
+
+// DAILY SALES REPORT
+app.get("/reports/daily/:branch_id", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT 
+         DATE(created_at) AS date,
+         SUM(total_amount) AS subtotal,
+         SUM(gst_amount) AS gst,
+         SUM(net_amount) AS total
+       FROM transactions
+       WHERE branch_id = $1 AND DATE(created_at) = CURRENT_DATE
+       GROUP BY DATE(created_at)`,
+      [req.params.branch_id]
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Daily report error:", error);
+    res.status(500).send("❌ Error loading daily report");
+  }
+});
+
+// MONTHLY SALES REPORT
+app.get("/reports/monthly/:branch_id", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT 
+         DATE_TRUNC('month', created_at) AS month,
+         SUM(total_amount) AS subtotal,
+         SUM(gst_amount) AS gst,
+         SUM(net_amount) AS total
+       FROM transactions
+       WHERE branch_id = $1
+       GROUP BY DATE_TRUNC('month', created_at)
+       ORDER BY month DESC`,
+      [req.params.branch_id]
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Monthly report error:", error);
+    res.status(500).send("❌ Error loading monthly report");
+  }
+});
+
+// PAYMENT SUMMARY REPORT
+app.get("/reports/payments/:branch_id", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT 
+         payment_method,
+         COUNT(*) AS count,
+         SUM(net_amount) AS total
+       FROM transactions
+       WHERE branch_id = $1
+       GROUP BY payment_method`,
+      [req.params.branch_id]
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Payment report error:", error);
+    res.status(500).send("❌ Error loading payment report");
+  }
+});
+
+// TOP SELLING ITEMS REPORT
+app.get("/reports/top-items/:branch_id", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT 
+         i.name,
+         SUM(oi.quantity) AS total_sold
+       FROM order_items oi
+       JOIN items i ON oi.item_id = i.id
+       JOIN orders o ON o.id = oi.order_id
+       WHERE o.branch_id = $1
+       GROUP BY i.name
+       ORDER BY total_sold DESC
+       LIMIT 10`,
+      [req.params.branch_id]
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Top items report error:", error);
+    res.status(500).send("❌ Error loading top items");
+  }
+});
+
 
 
 
