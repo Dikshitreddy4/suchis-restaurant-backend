@@ -476,6 +476,76 @@ app.get("/billing/view/:order_id", async (req, res) => {
     res.status(500).send("❌ Error loading bill");
   }
 });
+// ------------------------------
+// INVENTORY MANAGEMENT
+// ------------------------------
+
+// Add Inventory Item
+app.post("/inventory/add", async (req, res) => {
+  try {
+    const { branch_id, item_name, stock, low_stock_alert } = req.body;
+
+    await pool.query(
+      `INSERT INTO inventory (branch_id, item_name, stock, low_stock_alert)
+       VALUES ($1, $2, $3, $4)`,
+      [branch_id, item_name, stock, low_stock_alert]
+    );
+
+    res.send("📦 Inventory item added");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("❌ Error adding inventory item");
+  }
+});
+
+// Update Stock (Manual Addition or Correction)
+app.put("/inventory/update/:id", async (req, res) => {
+  try {
+    const { stock } = req.body;
+
+    await pool.query(
+      `UPDATE inventory SET stock = $1 WHERE id = $2`,
+      [stock, req.params.id]
+    );
+
+    res.send("🔄 Stock updated");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("❌ Error updating stock");
+  }
+});
+
+// Get Inventory for a Branch
+app.get("/inventory/list/:branch_id", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM inventory WHERE branch_id = $1 ORDER BY id ASC`,
+      [req.params.branch_id]
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("❌ Error loading inventory");
+  }
+});
+
+// Low Stock Alerts
+app.get("/inventory/alerts/:branch_id", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM inventory 
+       WHERE branch_id = $1 AND stock <= low_stock_alert`,
+      [req.params.branch_id]
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("❌ Error loading low stock alerts");
+  }
+});
+
 
 
 
