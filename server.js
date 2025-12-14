@@ -289,10 +289,15 @@ app.post("/billing/generate/:order_id", async (req, res) => {
 // ------------------------------
 // START SERVER (MUST BE LAST)
 // ------------------------------
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+// ------------------------------
+// START SERVER (IMPORTANT FOR RAILWAY)
+// ------------------------------
+const PORT = process.env.PORT;
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Server running on Railway Port: ${PORT}`);
 });
+
 
 
 
